@@ -23,6 +23,9 @@ table.t input{width:100%;padding:5px 7px}table.t input.n{width:70px;text-align:c
 .sheet .lo{position:absolute;left:24px;top:14px;width:17mm}.sheet h2{text-align:center;font-size:11pt;margin:0 0 14px;line-height:1.35}.sheet .inf td{padding:1px 0;font-weight:bold;font-size:10pt}
 .sheet table.lg{width:100%;border-collapse:collapse;margin-top:10px}.sheet .lg th,.sheet .lg td{border:1px solid #000;padding:0 5px;height:var(--rh,6mm);font-size:var(--fs,9pt)}.sheet .lg th{background:#f3f3f3;font-weight:normal}
 .sheet .ft{width:100%;margin-top:14px;font-size:9pt}.sheet .ft td{vertical-align:top;width:50%}
+.su th{position:sticky;top:0;background:#f1f5f9;z-index:2;font-size:11px;vertical-align:bottom}.su td{padding:3px 5px}.su .mh{min-width:78px;text-align:center}.su td:nth-child(n+5){text-align:center}
+.su .s1,.su .s2,.su .s3{position:sticky;background:#fff;z-index:1}.su th.s1,.su th.s2,.su th.s3{z-index:3;background:#f1f5f9}.su .s1{left:0;min-width:36px}.su .s2{left:36px;min-width:64px}.su .s3{left:100px;min-width:210px}
+.su tr.nk td{border-top:2px solid #94a3b8}.su input.n{width:58px}.z0{background:#fee2e2!important}.z1{background:#fef3c7!important}.z2{background:#dcfce7!important}.kz,.kb{font-weight:600}.lg2{font-size:12px;color:var(--mut);margin:10px 0}.lg2 span{padding:2px 8px;border-radius:6px;margin-right:6px}
 @page{size:A4 portrait;margin:12mm}
 @media print{body.printing *{visibility:hidden}body.printing .pr,body.printing .pr *{visibility:visible}.pr{position:absolute;left:0;top:0;width:100%;border:0;box-shadow:none;padding:0}.pr .lo{left:0;top:0}}
 </style></head><body>
@@ -47,11 +50,25 @@ table.t input{width:100%;padding:5px 7px}table.t input.n{width:70px;text-align:c
 <button class="b" onclick="lg()">Tampilkan</button><button class="b g" onclick="lprint()">🖨 Print</button></div></div>
 <div class="sheet pr" id="sheet" style="display:none"></div></section>
 
+<section id="p-susulan" class="hide"><div class="card"><div class="row">
+<label>Kelas<select id="ut"><option>X</option><option>XI</option><option>XII</option></select></label><label>Jurusan<select id="uj"></select></label>
+<label>Rombel<select id="ur"><option value="">Semua</option><option>1</option><option>2</option><option>3</option></select></label>
+<label>Semester<select id="us"><option>Gasal</option><option>Genap</option></select></label>
+<label>Tampilkan<select id="uf"><option value="k">Belum mengerjakan</option><option value="b">Belum tuntas</option><option value="a">Semua siswa</option></select></label>
+<label>Cari<input id="uq" placeholder="nama / NIS"></label><button class="b g hide" id="usv" onclick="saveSu()">💾 Simpan Susulan</button></div>
+<div class="lg2"><span class="z0">Belum ada nilai</span><span class="z1">Belum tuntas (&lt;KKM)</span><span class="z2">Tuntas</span><b id="usi"></b> • Admin: isi nilai langsung di kotak, tekan Enter untuk turun ke siswa berikutnya.</div>
+<div class="sc" id="ub" style="max-height:68vh;overflow:auto"></div></div></section>
+<section id="p-rank" class="hide"><div class="card"><div class="row">
+<label>Lingkup<select id="gl"><option value="kelas">Per Kelas</option><option value="jurusan">Per Jurusan</option><option value="angkatan">Per Angkatan</option></select></label>
+<label>Angkatan<select id="gt"><option>X</option><option>XI</option><option>XII</option></select></label><label id="gjw">Jurusan<select id="gj"></select></label>
+<label id="grw">Rombel<select id="gr"><option>1</option><option>2</option><option>3</option></select></label>
+<label>Tampilan<select id="gm" style="min-width:240px"></select></label><label>Semester<select id="gs"><option>Gasal</option><option>Genap</option></select></label></div>
+<div class="sc" id="gb" style="margin-top:12px"></div></div></section>
 <section id="p-admin" class="hide"></section>
 </main><div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const API_URL='https://script.google.com/macros/s/AKfycbyNAs4r6HQTJmy6TBJBs5wOp2yJ2zF5AKOnh2SwvZDnj3MRe5zKKybPqaVMJY59htHk/exec'; // URL Web App Apps Script (berakhiran /exec)
+const API_URL='https://script.google.com/macros/s/AKfycbyMHoluB7umt5Hrw-OF2js2RToEhMHMzO3OJjjNtch_kFs_zoam-mmXKmSB6WdTCSpr/exec'; // URL Web App Apps Script (berakhiran /exec)
 const rpc=(f,...a)=>fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:f,args:a})}).then(r=>r.json()).then(j=>{if(!j.ok)throw new Error(j.error);return j.data}).catch(e=>{toast(String(e.message).replace('Error: ',''),1);throw e});
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pred=n=>n===''||n==null?'':n<=59?'D':n<=69?'C':n<=74?'B-':n<=79?'B':n<=84?'B+':n<=89?'A-':n<=94?'A':'A+', tg=k=>k.split(' ')[0];
@@ -65,13 +82,13 @@ rpc('init').then(d=>{D=d;
  const J=[['','Semua Jurusan'],...Object.keys(D.jur).map(c=>[c,D.jur[c][0]])];
  $('#hm').innerHTML=mOpts();$('#hj').innerHTML=opt(J);$('#lj').innerHTML=opt(Object.keys(D.jur).map(c=>[c,D.jur[c][0]]));
  ['hm','hj','hk','hs'].forEach(i=>$('#'+i).onchange=i=='hk'||i=='hs'?stat:()=>{hk();stat()});
- $('#lt').onchange=lm;lm();hk();stat();nav();
+ $('#lt').onchange=lm;lm();hk();stat();nav();suInit(J);rkInit();
  $('#q').onkeydown=e=>{if(e.key=='Enter')cari()};
 });
-function nav(){const p=[['home','📊 Beranda'],['cari','🔍 Cari Siswa'],['legger','🖨 Legger PSAS'],['admin',TOK?'⚙ Admin':'🔐 Admin']];
+function nav(){const p=[['home','📊 Beranda'],['susulan','📝 Susulan'],['rank','🏆 Peringkat'],['cari','🔍 Cari Siswa'],['legger','🖨 Legger PSAS'],['admin',TOK?'⚙ Admin':'🔐 Admin']];
  $('#nav').innerHTML=p.map(x=>`<button class="${x[0]==page?'on':''}" onclick="go('${x[0]}')">${x[1]}</button>`).join('');
  $$('main>section').forEach(s=>s.classList.toggle('hide',s.id!='p-'+page))}
-function go(p){page=p;nav();if(p=='admin')adm()}
+function go(p){page=p;nav();if(p=='admin')adm();if(p=='susulan')su();if(p=='rank')rk()}
 function hk(){const t=tg($('#hm').value),j=$('#hj').value;$('#hk').innerHTML=opt([['','Semua Kelas'],...D.kelas.filter(k=>k.t==t&&(!j||k.c==j)).map(k=>k.k)])}
 function bars(el,lb,vals,max,fmt){const m=max||Math.max(1,...vals);$(el).innerHTML=vals.map(v=>`<div class="bw"><div class="bar" style="height:${v/m*88}%"><i>${fmt?fmt(v):v}</i></div></div>`).join('');$(lb).innerHTML=lb&&lb.map?'':lb.l.map(x=>`<span>${x}</span>`).join('')}
 function drawBars(el,lel,labels,vals,max){const m=max||Math.max(1,...vals);$(el).innerHTML=vals.map(v=>`<div class="bw"><div class="bar" style="height:${v/m*88}%"><i>${v}</i></div></div>`).join('')||'<p style="color:#64748b">Belum ada data</p>';$(lel).innerHTML=labels.map(x=>`<span>${x}</span>`).join('')}
@@ -102,6 +119,27 @@ async function lprint(){if(!$('#sheet').innerHTML)await lg();
  const h='<html><head><meta charset="utf-8"><style>td,th{border:1px solid #000}.inf td,.ft td{border:0}</style></head><body>'+$('#sheet').innerHTML+'</body></html>';
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+h],{type:'application/vnd.ms-excel'}));a.download=`Legger_${$('#lt').value}-${$('#lj').value}${$('#lr').value}_${$('#ls').value}.xls`;a.click()}
 
+// ===== SUSULAN =====
+const cn=v=>v===''?'z0':v<D.kkm?'z1':'z2';let SU=null;
+function suInit(J){$('#uj').innerHTML=opt(J);['ut','uj','ur','us'].forEach(i=>$('#'+i).onchange=su);$('#uf').onchange=suR;$('#uq').oninput=suR;
+ $('#ub').addEventListener('input',e=>{const i=e.target;if(i.tagName!='INPUT')return;const tr=i.closest('tr'),ins=[...tr.querySelectorAll('input')];i.parentNode.className=cn(i.value===''?'':+i.value);tr.querySelector('.kz').textContent=ins.filter(x=>x.value==='').length;tr.querySelector('.kb').textContent=ins.filter(x=>x.value!==''&&+x.value<D.kkm).length});
+ $('#ub').addEventListener('keydown',e=>{if(e.key!='Enter'||e.target.tagName!='INPUT')return;e.preventDefault();const n=$(`#ub input[data-r="${+e.target.dataset.r+1}"][data-c="${e.target.dataset.c}"]`);if(n){n.focus();n.select()}})}
+async function su(){$('#usv').classList.toggle('hide',!TOK);SU=await rpc('susulan',$('#ut').value,$('#uj').value,$('#ur').value,$('#us').value);suR()}
+function suR(){if(!SU)return;const f=$('#uf').value,q=$('#uq').value.toLowerCase(),ed=!!TOK;
+ const rows=SU.rows.filter(r=>(!q||r.nama.toLowerCase().includes(q)||r.nis.includes(q))&&(f=='a'||(f=='k'?r.v.some(v=>v===''):r.v.some(v=>v!==''&&v<D.kkm))));
+ const miss=SU.mapel.map((_,j)=>SU.rows.filter(r=>r.v[j]==='').length);let pk='';
+ $('#usi').textContent=`Menampilkan ${rows.length} dari ${SU.rows.length} siswa`;
+ $('#ub').innerHTML=`<table class="t su"><thead><tr><th class="s1">No</th><th class="s2">Kelas</th><th class="s3">Nama</th><th>NIS</th>${SU.mapel.map((m,j)=>`<th class="mh" title="${esc(SU.sheets[j])}">${esc(m.replace(/^[AB]\. /,''))}<br><small>kosong: ${miss[j]}</small></th>`).join('')}<th>Kosong</th><th>&lt;KKM</th></tr></thead><tbody>${rows.map((r,i)=>{const nk=r.kelas!=pk;pk=r.kelas;
+ return `<tr class="${nk?'nk':''}" data-n="${r.nis}"><td class="s1">${i+1}</td><td class="s2">${r.kelas}</td><td class="s3">${esc(r.nama)}</td><td>${r.nis}</td>${r.v.map((v,j)=>`<td class="${cn(v)}">${ed?`<input class="n" type="number" min="0" max="100" data-r="${i}" data-c="${j}" data-o="${v}" value="${v}">`:v===''?'–':v}</td>`).join('')}<td class="kz">${r.v.filter(v=>v==='').length}</td><td class="kb">${r.v.filter(v=>v!==''&&v<D.kkm).length}</td></tr>`}).join('')}</tbody></table>`}
+async function saveSu(){const ch=[];$$('#ub input').forEach(i=>{if(i.value!==i.dataset.o)ch.push({sheet:SU.sheets[i.dataset.c],nis:i.closest('tr').dataset.n,v:i.value})});
+ if(!ch.length)return toast('Tidak ada perubahan');toast(await rpc('saveSusulan',TOK,$('#us').value,ch));su()}
+// ===== PERINGKAT =====
+function rkInit(){$('#gj').innerHTML=opt(Object.keys(D.jur).map(c=>[c,D.jur[c][0]]));$('#gt').onchange=()=>{gm();rk()};['gl','gj','gr','gm','gs'].forEach(i=>$('#'+i).onchange=()=>{gv();rk()});gm();gv()}
+function gm(){$('#gm').innerHTML=opt([['','Seluruh Mata Pelajaran (rata-rata)'],...D.mapel[$('#gt').value]])}
+function gv(){const l=$('#gl').value;$('#gjw').style.display=l=='angkatan'?'none':'';$('#grw').style.display=l=='kelas'?'':'none'}
+async function rk(){const l=$('#gl').value,t=$('#gt').value,j=$('#gj').value,m=$('#gm').value,x=l!='kelas';
+ const r=await rpc('peringkat',t,l,j,`${t} ${j}${$('#gr').value}`,m,$('#gs').value),md=['🥇','🥈','🥉'];
+ $('#gb').innerHTML=r.rows.length?`<table class="t"><tr><th>Peringkat</th><th>NIS</th><th>Nama</th><th>Kelas</th>${x?'<th>Rank Kelas</th>':''}<th>${m?'Nilai':'Rata-rata'}</th>${m?'':'<th>Jumlah</th><th>Mapel Terisi</th>'}</tr>${r.rows.map(s=>`<tr><td><b>${md[s.rank-1]||s.rank}</b></td><td>${s.nis}</td><td>${esc(s.nama)}</td><td>${s.kelas}</td>${x?`<td>${s.rk}</td>`:''}<td><b>${m?s.avg:s.avg.toFixed(2)}</b></td>${m?'':`<td>${s.jml}</td><td>${s.n}/${r.tot}</td>`}</tr>`).join('')}</table>`:'<p style="color:#64748b">Belum ada nilai pada lingkup ini.</p>'}
 // ===== ADMIN =====
 let at='nilai';
 function adm(){if(!TOK){$('#p-admin').innerHTML=`<div class="card" style="max-width:360px;margin:auto"><h3>Login Admin</h3><div class="row"><label style="flex:1">Kata sandi<input type="password" id="pw" onkeydown="if(event.key=='Enter')dologin()"></label><button class="b" onclick="dologin()">Masuk</button></div></div>`;return}
