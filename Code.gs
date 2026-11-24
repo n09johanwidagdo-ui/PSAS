@@ -1,5 +1,5 @@
 /** APLIKASI NILAI SISWA - SMK NEGERI 2 PATI | Database: Google Spreadsheet (script terikat) */
-const KKM = 75;
+const KKM = 70;
 const JUR = {B:['DPIB','Desain Pemodelan dan Informasi Bangunan'],E:['TAV','Teknik Audio Video'],L:['TOI','Teknik Otomasi Industri'],M:['TP','Teknik Pemesinan'],O:['TKRO','Teknik Kendaraan Ringan Otomotif'],D:['DKV','Desain Komunikasi Visual']};
 const MAPEL = {
   X:['A. Pendidikan Agama dan Budi Pekerti','A. Pendidikan Pancasila','A. Bahasa Indonesia','A. Pendidikan Jasmani, Olahraga, dan Kesehatan','A. Sejarah','A. Seni','B. Matematika','B. Bahasa Inggris','B. Informatika','B. Proyek Ilmu Pengetahuan Alam dan Sosial','B. Dasar-Dasar Program Keahlian','Mulok Bahasa Jawa'],
@@ -178,8 +178,37 @@ function delMapel(tok, sh) {
   return { msg: 'Mata pelajaran & nilainya dihapus', mapel: mapelAll() };
 }
 
+// ===== SUSULAN: rekap siswa belum mengerjakan (baris: Kelas > Nama, kolom: tiap mata pelajaran) =====
+function susulan(t, jur, rom, sem) {
+  const col = sem == 'Genap' ? 3 : 2, sh = sn(t);
+  const sis = data('Siswa').filter(r => { const k = String(r[2]).split(' '); return k[0] == t && (!jur || k[1][0] == jur) && (!rom || k[1].slice(1) == rom); })
+    .sort((a, b) => (a[2] + a[1]) < (b[2] + b[1]) ? -1 : 1);
+  const m = sh.map(n => { const o = {}; data(n).forEach(r => o[String(r[0])] = r[col]); return o; });
+  return { sheets: sh, mapel: sh.map(n => n.substring(t.length + 1)), rows: sis.map(r => ({ nis: String(r[0]), nama: r[1], kelas: r[2], v: m.map(o => o[String(r[0])] ?? '') })) };
+}
+function saveSusulan(tok, sem, ch) {
+  A(tok); const col = sem == 'Genap' ? 4 : 3, by = {};
+  ch.forEach(c => { if (!c.sheet) throw new Error('Mata pelajaran tidak valid'); chk(c.sheet); (by[c.sheet] = by[c.sheet] || []).push(c); });
+  Object.keys(by).forEach(n => { const s = SS().getSheetByName(n), idx = {}; data(n).forEach((r, i) => idx[String(r[0])] = i + 2);
+    by[n].forEach(c => { if (idx[c.nis]) s.getRange(idx[c.nis], col).setValue(c.v === '' ? '' : Number(c.v)); }); });
+  return ch.length + ' nilai tersimpan';
+}
+// ===== PERINGKAT: lingkup kelas / jurusan / angkatan; mapel tertentu atau seluruh mapel (rata-rata) =====
+function peringkat(t, ling, jur, kelas, mapel, sem) {
+  chk(mapel); const col = sem == 'Genap' ? 3 : 2;
+  const sis = data('Siswa').filter(r => { const k = String(r[2]); if (k.split(' ')[0] != t) return false; return ling == 'kelas' ? k == kelas : ling == 'jurusan' ? k.split(' ')[1][0] == jur : true; });
+  const sh = mapel ? [mapel] : sn(t), sum = {}, cnt = {};
+  sh.forEach(n => data(n).forEach(r => { const v = r[col]; if (v === '' || v === null) return; const k = String(r[0]); sum[k] = (sum[k] || 0) + Number(v); cnt[k] = (cnt[k] || 0) + 1; }));
+  const rows = sis.filter(r => cnt[String(r[0])]).map(r => { const k = String(r[0]); return { nis: k, nama: r[1], kelas: r[2], n: cnt[k], jml: sum[k], avg: Math.round(sum[k] / cnt[k] * 100) / 100 }; });
+  rows.sort((a, b) => b.avg - a.avg || (a.nama < b.nama ? -1 : 1));
+  let rk = 0, pv = null; rows.forEach((r, i) => { if (r.avg !== pv) { rk = i + 1; pv = r.avg; } r.rank = rk; });
+  const g = {}; rows.forEach(r => (g[r.kelas] = g[r.kelas] || []).push(r));
+  Object.keys(g).forEach(k => { let x = 0, p = null; g[k].forEach((r, i) => { if (r.avg !== p) { x = i + 1; p = r.avg; } r.rk = x; }); });
+  return { rows, tot: sh.length };
+}
+
 // ===== API JSON untuk frontend di Netlify (fetch POST) =====
-const API = { init, login, getKelas, statistik, cari, saveNilai, listSiswa, saveSiswa, delSiswa, importSiswa, saveWali, addMapel, editMapel, delMapel };
+const API = { init, login, getKelas, statistik, cari, saveNilai, listSiswa, saveSiswa, delSiswa, importSiswa, saveWali, addMapel, editMapel, delMapel, susulan, saveSusulan, peringkat };
 function doPost(e) {
   let out;
   try {
