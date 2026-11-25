@@ -54,7 +54,7 @@ table.t input{width:100%;padding:5px 7px}table.t input.n{width:70px;text-align:c
 <label>Kelas<select id="ut"><option>X</option><option>XI</option><option>XII</option></select></label><label>Jurusan<select id="uj"></select></label>
 <label>Rombel<select id="ur"><option value="">Semua</option><option>1</option><option>2</option><option>3</option></select></label>
 <label>Semester<select id="us"><option>Gasal</option><option>Genap</option></select></label>
-<label>Tampilkan<select id="uf"><option value="k">Belum mengerjakan</option><option value="b">Belum tuntas</option><option value="a">Semua siswa</option></select></label>
+<label>Tampilan<select id="um" style="min-width:200px"><option value="">Seluruh Mata Pelajaran</option></select></label><label>Tampilkan<select id="uf"><option value="k">Belum ada nilai</option><option value="b">Belum tuntas</option></select></label>
 <label>Cari<input id="uq" placeholder="nama / NIS"></label><button class="b g hide" id="usv" onclick="saveSu()">💾 Simpan Susulan</button></div>
 <div class="lg2"><span class="z0">Belum ada nilai</span><span class="z1">Belum tuntas (&lt;KKM)</span><span class="z2">Tuntas</span><b id="usi"></b> • Admin: isi nilai langsung di kotak, tekan Enter untuk turun ke siswa berikutnya.</div>
 <div class="sc" id="ub" style="max-height:68vh;overflow:auto"></div></div></section>
@@ -68,7 +68,7 @@ table.t input{width:100%;padding:5px 7px}table.t input.n{width:70px;text-align:c
 </main><div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const API_URL='https://script.google.com/macros/s/AKfycbyMHoluB7umt5Hrw-OF2js2RToEhMHMzO3OJjjNtch_kFs_zoam-mmXKmSB6WdTCSpr/exec'; // URL Web App Apps Script (berakhiran /exec)
+const API_URL='https://script.google.com/macros/s/AKfycbz1ba5EbUa7W0wUf9od5n_xTa7cv-sXhrf89jQT-yeyyPpjq2_Gjkm9f0LZV-t8ETnF/exec'; // URL Web App Apps Script (berakhiran /exec)
 const rpc=(f,...a)=>fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:f,args:a})}).then(r=>r.json()).then(j=>{if(!j.ok)throw new Error(j.error);return j.data}).catch(e=>{toast(String(e.message).replace('Error: ',''),1);throw e});
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const pred=n=>n===''||n==null?'':n<=59?'D':n<=69?'C':n<=74?'B-':n<=79?'B':n<=84?'B+':n<=89?'A-':n<=94?'A':'A+', tg=k=>k.split(' ')[0];
@@ -121,16 +121,17 @@ async function lprint(){if(!$('#sheet').innerHTML)await lg();
 
 // ===== SUSULAN =====
 const cn=v=>v===''?'z0':v<D.kkm?'z1':'z2';let SU=null;
-function suInit(J){$('#uj').innerHTML=opt(J);['ut','uj','ur','us'].forEach(i=>$('#'+i).onchange=su);$('#uf').onchange=suR;$('#uq').oninput=suR;
+function suInit(J){$('#uj').innerHTML=opt(J);['uj','ur','us'].forEach(i=>$('#'+i).onchange=su);$('#ut').onchange=()=>{$('#um').innerHTML='';su()};$('#uf').onchange=suR;$('#um').onchange=suR;$('#uq').oninput=suR;
  $('#ub').addEventListener('input',e=>{const i=e.target;if(i.tagName!='INPUT')return;const tr=i.closest('tr'),ins=[...tr.querySelectorAll('input')];i.parentNode.className=cn(i.value===''?'':+i.value);tr.querySelector('.kz').textContent=ins.filter(x=>x.value==='').length;tr.querySelector('.kb').textContent=ins.filter(x=>x.value!==''&&+x.value<D.kkm).length});
  $('#ub').addEventListener('keydown',e=>{if(e.key!='Enter'||e.target.tagName!='INPUT')return;e.preventDefault();const n=$(`#ub input[data-r="${+e.target.dataset.r+1}"][data-c="${e.target.dataset.c}"]`);if(n){n.focus();n.select()}})}
-async function su(){$('#usv').classList.toggle('hide',!TOK);SU=await rpc('susulan',$('#ut').value,$('#uj').value,$('#ur').value,$('#us').value);suR()}
-function suR(){if(!SU)return;const f=$('#uf').value,q=$('#uq').value.toLowerCase(),ed=!!TOK;
- const rows=SU.rows.filter(r=>(!q||r.nama.toLowerCase().includes(q)||r.nis.includes(q))&&(f=='a'||(f=='k'?r.v.some(v=>v===''):r.v.some(v=>v!==''&&v<D.kkm))));
+async function su(){$('#usv').classList.toggle('hide',!TOK);SU=await rpc('susulan',$('#ut').value,$('#uj').value,$('#ur').value,$('#us').value);const pv=$('#um').value;$('#um').innerHTML=opt([['','Seluruh Mata Pelajaran'],...SU.mapel.map((m,j)=>[j,m])]);$('#um').value=pv;if($('#um').value!==pv)$('#um').value='';suR()}
+function suR(){if(!SU)return;const f=$('#uf').value,q=$('#uq').value.toLowerCase(),ed=!!TOK,m=$('#um').value,cols=SU.mapel.map((_,j)=>j).filter(j=>m===''||j==+m);
+ const bad=v=>f=='k'?v==='':(v!==''&&v<D.kkm);
+ const rows=SU.rows.filter(r=>(!q||r.nama.toLowerCase().includes(q)||r.nis.includes(q))&&cols.some(j=>bad(r.v[j])));
  const miss=SU.mapel.map((_,j)=>SU.rows.filter(r=>r.v[j]==='').length);let pk='';
  $('#usi').textContent=`Menampilkan ${rows.length} dari ${SU.rows.length} siswa`;
- $('#ub').innerHTML=`<table class="t su"><thead><tr><th class="s1">No</th><th class="s2">Kelas</th><th class="s3">Nama</th><th>NIS</th>${SU.mapel.map((m,j)=>`<th class="mh" title="${esc(SU.sheets[j])}">${esc(m.replace(/^[AB]\. /,''))}<br><small>kosong: ${miss[j]}</small></th>`).join('')}<th>Kosong</th><th>&lt;KKM</th></tr></thead><tbody>${rows.map((r,i)=>{const nk=r.kelas!=pk;pk=r.kelas;
- return `<tr class="${nk?'nk':''}" data-n="${r.nis}"><td class="s1">${i+1}</td><td class="s2">${r.kelas}</td><td class="s3">${esc(r.nama)}</td><td>${r.nis}</td>${r.v.map((v,j)=>`<td class="${cn(v)}">${ed?`<input class="n" type="number" min="0" max="100" data-r="${i}" data-c="${j}" data-o="${v}" value="${v}">`:v===''?'–':v}</td>`).join('')}<td class="kz">${r.v.filter(v=>v==='').length}</td><td class="kb">${r.v.filter(v=>v!==''&&v<D.kkm).length}</td></tr>`}).join('')}</tbody></table>`}
+ $('#ub').innerHTML=`<table class="t su"><thead><tr><th class="s1">No</th><th class="s2">Kelas</th><th class="s3">Nama</th><th>NIS</th>${cols.map(j=>`<th class="mh" title="${esc(SU.sheets[j])}">${esc(SU.mapel[j].replace(/^[AB]\. /,''))}<br><small>kosong: ${miss[j]}</small></th>`).join('')}<th>Kosong</th><th>&lt;KKM</th></tr></thead><tbody>${rows.map((r,i)=>{const nk=r.kelas!=pk;pk=r.kelas;
+ return `<tr class="${nk?'nk':''}" data-n="${r.nis}"><td class="s1">${i+1}</td><td class="s2">${r.kelas}</td><td class="s3">${esc(r.nama)}</td><td>${r.nis}</td>${cols.map(j=>{const v=r.v[j];return `<td class="${cn(v)}">${ed?`<input class="n" type="number" min="0" max="100" data-r="${i}" data-c="${j}" data-o="${v}" value="${v}">`:v===''?'–':v}</td>`}).join('')}<td class="kz">${cols.filter(j=>r.v[j]==='').length}</td><td class="kb">${cols.filter(j=>r.v[j]!==''&&r.v[j]<D.kkm).length}</td></tr>`}).join('')}</tbody></table>`}
 async function saveSu(){const ch=[];$$('#ub input').forEach(i=>{if(i.value!==i.dataset.o)ch.push({sheet:SU.sheets[i.dataset.c],nis:i.closest('tr').dataset.n,v:i.value})});
  if(!ch.length)return toast('Tidak ada perubahan');toast(await rpc('saveSusulan',TOK,$('#us').value,ch));su()}
 // ===== PERINGKAT =====
@@ -143,8 +144,8 @@ async function rk(){const l=$('#gl').value,t=$('#gt').value,j=$('#gj').value,m=$
 // ===== ADMIN =====
 let at='nilai';
 function adm(){if(!TOK){$('#p-admin').innerHTML=`<div class="card" style="max-width:360px;margin:auto"><h3>Login Admin</h3><div class="row"><label style="flex:1">Kata sandi<input type="password" id="pw" onkeydown="if(event.key=='Enter')dologin()"></label><button class="b" onclick="dologin()">Masuk</button></div></div>`;return}
- $('#p-admin').innerHTML=`<div class="card"><div class="row"><button class="b ${at=='nilai'?'':'l'}" onclick="at='nilai';adm()">Nilai</button><button class="b ${at=='siswa'?'':'l'}" onclick="at='siswa';adm()">Siswa</button><button class="b ${at=='mapel'?'':'l'}" onclick="at='mapel';adm()">Mata Pelajaran</button><button class="b ${at=='wali'?'':'l'}" onclick="at='wali';adm()">Wali Kelas</button><button class="b l" onclick="TOK=null;nav();adm()">Keluar</button></div></div><div id="ab"></div>`;
- ({nilai:aNilai,siswa:aSiswa,mapel:aMapel,wali:aWali})[at]()}
+ $('#p-admin').innerHTML=`<div class="card"><div class="row"><button class="b ${at=='nilai'?'':'l'}" onclick="at='nilai';adm()">Nilai</button><button class="b ${at=='siswa'?'':'l'}" onclick="at='siswa';adm()">Siswa</button><button class="b ${at=='mapel'?'':'l'}" onclick="at='mapel';adm()">Mata Pelajaran</button><button class="b ${at=='wali'?'':'l'}" onclick="at='wali';adm()">Wali Kelas</button><button class="b ${at=='peng'?'':'l'}" onclick="at='peng';adm()">Pengaturan</button><button class="b l" onclick="TOK=null;nav();adm()">Keluar</button></div></div><div id="ab"></div>`;
+ ({nilai:aNilai,siswa:aSiswa,mapel:aMapel,wali:aWali,peng:aPeng})[at]()}
 async function dologin(){TOK=await rpc('login',$('#pw').value);nav();adm()}
 const kOpts=s=>opt(D.kelas.map(k=>k.k),s);
 function aNilai(){$('#ab').innerHTML=`<div class="card"><div class="row"><label>Mata Pelajaran<select id="am" style="min-width:260px">${mOpts()}</select></label><label>Kelas<select id="ak">${kOpts('X D3')}</select></label><button class="b" onclick="loadN()">Tampilkan</button><button class="b g" onclick="saveN()">💾 Simpan</button></div><div class="sc" id="an" style="margin-top:12px"></div></div>`;
@@ -168,6 +169,11 @@ function mDone(r){D.mapel=r.mapel;$('#hm').innerHTML=mOpts();lm();if($('#hm').va
 async function addM(){mDone(await rpc('addMapel',TOK,$('#mt').value,$('#mn').value))}
 async function edM(b){const tr=b.closest('tr');mDone(await rpc('editMapel',TOK,tr.dataset.s,tr.querySelector('input').value))}
 async function dlM(b){if(!confirm('Hapus mata pelajaran ini beserta seluruh nilainya?'))return;mDone(await rpc('delMapel',TOK,b.closest('tr').dataset.s))}
+function aPeng(){$('#ab').innerHTML=`<div class="card" style="max-width:460px"><h3>Nilai KKM</h3><div class="row"><label>KKM (0-100)<input id="kk" type="number" min="0" max="100" value="${D.kkm}"></label><button class="b g" onclick="svK()">Simpan KKM</button></div>
+ <p style="font-size:12px;color:#64748b">KKM dipakai untuk status Tuntas/Belum Tuntas di Beranda, Legger, dan Susulan.</p></div>
+ <div class="card" style="max-width:460px"><h3>Ganti Kata Sandi Admin</h3><div class="row" style="flex-direction:column;align-items:stretch"><label>Kata sandi lama<input id="pl" type="password"></label><label>Kata sandi baru (min. 6 karakter)<input id="pb" type="password"></label><label>Ulangi kata sandi baru<input id="pu" type="password"></label><button class="b" onclick="svP()">Ganti Kata Sandi</button></div></div>`}
+async function svK(){const r=await rpc('setKKM',TOK,$('#kk').value);D.kkm=r.kkm;toast(r.msg);stat()}
+async function svP(){if($('#pb').value!==$('#pu').value)return toast('Konfirmasi kata sandi tidak sama',1);toast(await rpc('gantiPassword',TOK,$('#pl').value,$('#pb').value));['#pl','#pb','#pu'].forEach(i=>$(i).value='')}
 function aWali(){$('#ab').innerHTML=`<div class="card"><button class="b g" onclick="svW()">💾 Simpan Semua</button><div class="sc" style="margin-top:12px"><table class="t"><tr><th>Kelas</th><th>Nama Wali Kelas</th><th>NIP</th></tr>${D.kelas.map(k=>{const w=D.wali[k.k]||['',''];return `<tr><td>${k.k}</td><td><input value="${esc(w[0])}"></td><td><input value="${esc(w[1])}"></td></tr>`}).join('')}</table></div></div>`}
 async function svW(){const rows=$$('#ab tr').slice(1).map(tr=>{const i=tr.querySelectorAll('input');return [tr.cells[0].textContent,i[0].value,"'"===''?'':String(i[1].value)]});
  toast(await rpc('saveWali',TOK,rows));rows.forEach(r=>D.wali[r[0]]=[r[1],r[2]])}
