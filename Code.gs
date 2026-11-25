@@ -1,5 +1,5 @@
 /** APLIKASI NILAI SISWA - SMK NEGERI 2 PATI | Database: Google Spreadsheet (script terikat) */
-const KKM = 70;
+const kkm = () => Number(PropertiesService.getScriptProperties().getProperty('KKM')) || 70; // KKM dapat diatur admin
 const JUR = {B:['DPIB','Desain Pemodelan dan Informasi Bangunan'],E:['TAV','Teknik Audio Video'],L:['TOI','Teknik Otomasi Industri'],M:['TP','Teknik Pemesinan'],O:['TKRO','Teknik Kendaraan Ringan Otomotif'],D:['DKV','Desain Komunikasi Visual']};
 const MAPEL = {
   X:['A. Pendidikan Agama dan Budi Pekerti','A. Pendidikan Pancasila','A. Bahasa Indonesia','A. Pendidikan Jasmani, Olahraga, dan Kesehatan','A. Sejarah','A. Seni','B. Matematika','B. Bahasa Inggris','B. Informatika','B. Proyek Ilmu Pengetahuan Alam dan Sosial','B. Dasar-Dasar Program Keahlian','Mulok Bahasa Jawa'],
@@ -62,7 +62,7 @@ function setup() {
 
 function init() {
   const wali = {}; data('WaliKelas').forEach(r => wali[r[0]] = [r[1], r[2]]);
-  return { kelas: data('Kelas').map(r => ({ k: r[0], t: r[1], c: r[2], j: r[3] })), jur: JUR, mapel: mapelAll(), wali, kkm: KKM };
+  return { kelas: data('Kelas').map(r => ({ k: r[0], t: r[1], c: r[2], j: r[3] })), jur: JUR, mapel: mapelAll(), wali, kkm: kkm() };
 }
 function login(p) {
   if (p !== PropertiesService.getScriptProperties().getProperty('ADMIN_PASS')) throw new Error('Kata sandi salah');
@@ -76,13 +76,13 @@ function getKelas(kelas, sheet) {
 }
 
 function statistik(sheet, jur, kelas, sem) {
-  chk(sheet); const t = sheet.split(' ')[0], col = sem == 'Genap' ? 3 : 2, sis = {}, nm = {}, ada = {};
+  chk(sheet); const K = kkm(), t = sheet.split(' ')[0], col = sem == 'Genap' ? 3 : 2, sis = {}, nm = {}, ada = {};
   data('Siswa').forEach(r => { const k = r[2]; if (k.split(' ')[0] != t) return; if (kelas && k != kelas) return; if (jur && k.split(' ')[1][0] != jur) return; sis[String(r[0])] = k; nm[String(r[0])] = r[1]; });
   const bins = [0, 0, 0, 0, 0], ks = {}, all = [];
   data(sheet).forEach(r => { const k = sis[String(r[0])], v = r[col]; if (!k || v === '' || v === null) return; ada[String(r[0])] = 1; const n = Number(v); all.push(n); bins[n < 60 ? 0 : n < 70 ? 1 : n < 80 ? 2 : n < 90 ? 3 : 4]++; (ks[k] = ks[k] || []).push(n); });
   const avg = a => a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10 : 0;
   return { siswa: Object.keys(sis).length, n: all.length, avg: avg(all), max: all.length ? Math.max.apply(null, all) : 0, min: all.length ? Math.min.apply(null, all) : 0,
-    tuntas: all.length ? Math.round(all.filter(x => x >= KKM).length * 100 / all.length) : 0, bins, belum: Object.keys(sis).filter(x => !ada[x]).map(x => ({ nis: x, nama: nm[x], kelas: sis[x] })).sort((a, b) => (a.kelas + a.nama) < (b.kelas + b.nama) ? -1 : 1), kelas: Object.keys(ks).sort().map(k => ({ k, avg: avg(ks[k]), n: ks[k].length })) };
+    tuntas: all.length ? Math.round(all.filter(x => x >= K).length * 100 / all.length) : 0, bins, belum: Object.keys(sis).filter(x => !ada[x]).map(x => ({ nis: x, nama: nm[x], kelas: sis[x] })).sort((a, b) => (a.kelas + a.nama) < (b.kelas + b.nama) ? -1 : 1), kelas: Object.keys(ks).sort().map(k => ({ k, avg: avg(ks[k]), n: ks[k].length })) };
 }
 
 function cari(q) {
@@ -207,8 +207,20 @@ function peringkat(t, ling, jur, kelas, mapel, sem) {
   return { rows, tot: sh.length };
 }
 
+// ===== PENGATURAN ADMIN =====
+function setKKM(tok, n) {
+  A(tok); n = Number(n); if (!isFinite(n) || n < 0 || n > 100) throw new Error('KKM harus 0 - 100');
+  PropertiesService.getScriptProperties().setProperty('KKM', String(Math.round(n))); return { msg: 'KKM disimpan: ' + Math.round(n), kkm: Math.round(n) };
+}
+function gantiPassword(tok, lama, baru) {
+  A(tok); const p = PropertiesService.getScriptProperties();
+  if (lama !== p.getProperty('ADMIN_PASS')) throw new Error('Kata sandi lama salah');
+  if (String(baru).length < 6) throw new Error('Kata sandi baru minimal 6 karakter');
+  p.setProperty('ADMIN_PASS', String(baru)); return 'Kata sandi berhasil diganti';
+}
+
 // ===== API JSON untuk frontend di Netlify (fetch POST) =====
-const API = { init, login, getKelas, statistik, cari, saveNilai, listSiswa, saveSiswa, delSiswa, importSiswa, saveWali, addMapel, editMapel, delMapel, susulan, saveSusulan, peringkat };
+const API = { init, login, getKelas, statistik, cari, saveNilai, listSiswa, saveSiswa, delSiswa, importSiswa, saveWali, addMapel, editMapel, delMapel, susulan, saveSusulan, peringkat, setKKM, gantiPassword };
 function doPost(e) {
   let out;
   try {
